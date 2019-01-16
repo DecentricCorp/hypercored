@@ -6,6 +6,8 @@ var datDns = require('dat-dns')()
 var wss = require('websocket-stream')
 var archiver = require('hypercore-archiver')
 var swarm = require('hypercore-archiver/swarm')
+var Dat = require('dat-node')
+var ram = require('random-access-memory')
 var readFile = require('read-file-live')
 var minimist = require('minimist')
 var path = require('path')
@@ -17,7 +19,9 @@ var cwd = argv.cwd || process.cwd()
 
 var port = argv.port || process.env.PORT || 0
 var unencryptedWebsockets = !!argv['unencrypted-websockets']
-
+	
+var PubNub = require('pubnub')
+var pubnub
 var ar
 
 if (argv.help) {
@@ -36,9 +40,10 @@ if (unencryptedWebsockets) {
 }
 
 module.exports = {
-  init: function(eventHooks){
+  init: function(eventHooks, opts){
     var saveHook = eventHooks.save
     var readHook = eventHooks.read
+    initPubNub(opts)
     ar = archiver(path.join(cwd, 'archiver'), argv._[0])
     var server = http.createServer()
 
@@ -47,6 +52,15 @@ module.exports = {
     })
 
     ar.on('add', function (feed) {
+      Dat(ram, feed, function (err, dat) {
+        dat.joinNetwork()
+        dat.trackStats()
+        var st = dat.stats.get()
+        console.log(st)
+        dat.archive.readFile('/shadow.json', (err, content)=>{
+          if (!error) console.log(content.toString())
+        })
+      })
       console.log('Adding', feed.key.toString('hex'))
       readHook('add', ()=>{
         console.log('fired read hook on add')
@@ -91,6 +105,47 @@ module.exports = {
     if (argv.websockets === true) {
       server.listen(port, function () {
         console.log('WebSocket server listening on port %d', server.address().port)
+      })
+    }
+    function initPubNub(opts){ 
+      pubnub = new PubNub({
+          subscribeKey: opts.mySubscribeKey || 'demo',
+          publishKey: opts.myPublishKey || 'demo',
+          secretKey: opts.secretKey || '',
+          ssl: true
+      })
+      pubnub.addListener({
+        status: function(statusEvent) {
+            /* if (statusEvent.category === "PNConnectedCategory") {
+                var payload = {
+                    my: 'payload'
+                };
+                pubnub.publish(
+                    { 
+                        message: payload,
+                        channel: 'dat_archival'
+                    }, 
+                    function (status) {
+                        // handle publish response
+                    }
+                );
+            } */
+        },
+        message: function(envelope) {
+            var payload = envelope.message
+            //if (payload.type === 'add') {
+              saveHook(payload.type, payload.keyHex, ()=>{
+                console.log('fired save hook on', payload.tyype)
+              })
+            //}
+
+        },
+        presence: function(presenceEvent) {
+            // handle presence
+        }
+    })
+      pubnub.subscribe({
+          channels: ['dat_archival'],
       })
     }
   }

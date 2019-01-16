@@ -5,8 +5,10 @@
   "main": "index.js",
   "dependencies": {
     "dat-dns": "^1.3.2",
+    "dat-node": "git+https://github.com/DecentricCorp/dat-node.git",
     "hypercore-archiver": "^4.1.0",
     "minimist": "^1.2.0",
+    "pubnub": "^4.21.7",
     "pump": "^1.0.2",
     "read-file-live": "^1.0.1",
     "websocket-stream": "^5.0.0"
