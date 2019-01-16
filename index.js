@@ -21,7 +21,7 @@ var port = argv.port || process.env.PORT || 0
 var unencryptedWebsockets = !!argv['unencrypted-websockets']
 	
 var PubNub = require('pubnub')
-var pubnub
+var pubnub, pubnubOptions
 var ar
 
 if (argv.help) {
@@ -43,6 +43,7 @@ module.exports = {
   init: function(eventHooks, opts){
     var saveHook = eventHooks.save
     var readHook = eventHooks.read
+    var metadataHook = eventHooks.meta
     initPubNub(opts)
     ar = archiver(path.join(cwd, 'archiver'), argv._[0])
     var server = http.createServer()
@@ -54,11 +55,14 @@ module.exports = {
     ar.on('add', function (feed) {
       Dat(ram, feed, function (err, dat) {
         dat.joinNetwork()
-        dat.trackStats()
-        var st = dat.stats.get()
-        console.log(st)
+        //dat.trackStats()
+        //var st = dat.stats.get()
+        //console.log(st)
         dat.archive.readFile('/shadow.json', (err, content)=>{
-          if (!err) console.log(content.toString())
+          if (!err) {
+            console.log(content.toString())
+            metadataHook('add', dat.key.toString('hex'), content.toString())
+          }
         })
       })
       console.log('Adding', feed.key.toString('hex'))
@@ -75,6 +79,7 @@ module.exports = {
       readHook('remove', ()=>{
         console.log('fired read hook on remove')
         saveHook('remove', feed.key.toString('hex'), ()=>{
+          metadataHook('remove', feed.key.toString('hex'))
           console.log('fired save hook on remove')
         })        
       })
@@ -108,6 +113,7 @@ module.exports = {
       })
     }
     function initPubNub(opts){ 
+      pubnubOptions = opts
       pubnub = new PubNub({
           subscribeKey: opts.mySubscribeKey || 'demo',
           publishKey: opts.myPublishKey || 'demo',
@@ -145,7 +151,7 @@ module.exports = {
         }
     })
       pubnub.subscribe({
-          channels: ['dat_archival'],
+          channels: [pubnubOptions.myChannel || 'demo'],
       })
     }
   }
