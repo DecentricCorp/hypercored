@@ -58,7 +58,7 @@ module.exports = {
         var st = dat.stats.get()
         console.log(st)
         dat.archive.readFile('/shadow.json', (err, content)=>{
-          if (!error) console.log(content.toString())
+          if (!err) console.log(content.toString())
         })
       })
       console.log('Adding', feed.key.toString('hex'))
