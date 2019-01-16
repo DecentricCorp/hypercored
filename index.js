@@ -21,7 +21,7 @@ var port = argv.port || process.env.PORT || 0
 var unencryptedWebsockets = !!argv['unencrypted-websockets']
 	
 var PubNub = require('pubnub')
-var pubnub, pubnubOptions
+var pubnub, pubnubOptions, options
 var ar
 
 if (argv.help) {
@@ -41,6 +41,7 @@ if (unencryptedWebsockets) {
 
 module.exports = {
   init: function(eventHooks, opts){
+    options = opts
     var saveHook = eventHooks.save
     var readHook = eventHooks.read
     var metadataHook = eventHooks.meta
@@ -154,6 +155,24 @@ module.exports = {
           channels: [pubnubOptions.myChannel || 'demo'],
       })
     }
+    readFile(options.feedPath || path.join(cwd, 'feeds'), function (file) {
+      resolveAll(file.toString().trim().split('\n'), function (err, feeds) {
+        if (err) return
+    
+        ar.list(function (err, keys) {
+          if (err || !ar.changes.writable) return
+    
+          var i = 0
+    
+          for (i = 0; i < keys.length; i++) {
+            if (feeds.indexOf(keys[i].toString('hex')) === -1) ar.remove(keys[i])
+          }
+          for (i = 0; i < feeds.length; i++) {
+            ar.add(feeds[i])
+          }
+        })
+      })
+    })
   }
 }
 
@@ -171,24 +190,7 @@ function resolveAll (links, cb) {
   }
 }
 
-readFile(path.join(cwd, 'feeds'), function (file) {
-  resolveAll(file.toString().trim().split('\n'), function (err, feeds) {
-    if (err) return
 
-    ar.list(function (err, keys) {
-      if (err || !ar.changes.writable) return
-
-      var i = 0
-
-      for (i = 0; i < keys.length; i++) {
-        if (feeds.indexOf(keys[i].toString('hex')) === -1) ar.remove(keys[i])
-      }
-      for (i = 0; i < feeds.length; i++) {
-        ar.add(feeds[i])
-      }
-    })
-  })
-})
 
 function onwebsocket (stream) {
   pump(stream, ar.replicate({live: true, encrypt: !unencryptedWebsockets}), stream)
