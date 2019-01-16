@@ -14,10 +14,11 @@ var http = require('http')
 
 var argv = minimist(process.argv.slice(2))
 var cwd = argv.cwd || process.cwd()
-var ar = archiver(path.join(cwd, 'archiver'), argv._[0])
-var server = http.createServer()
+
 var port = argv.port || process.env.PORT || 0
 var unencryptedWebsockets = !!argv['unencrypted-websockets']
+
+var ar
 
 if (argv.help) {
   console.log(
@@ -34,43 +35,65 @@ if (unencryptedWebsockets) {
   argv.websockets = true
 }
 
-ar.on('sync', function (feed) {
-  console.log('Fully synced', feed.key.toString('hex'))
-})
+module.exports = {
+  init: function(eventHooks){
+    var saveHook = eventHooks.save
+    var readHook = eventHooks.read
+    ar = archiver(path.join(cwd, 'archiver'), argv._[0])
+    var server = http.createServer()
 
-ar.on('add', function (feed) {
-  console.log('Adding', feed.key.toString('hex'))
-})
+    ar.on('sync', function (feed) {
+      console.log('Fully synced', feed.key.toString('hex'))
+    })
 
-ar.on('remove', function (feed) {
-  console.log('Removing', feed.key.toString('hex'))
-})
+    ar.on('add', function (feed) {
+      console.log('Adding', feed.key.toString('hex'))
+      readHook('add', ()=>{
+        console.log('fired read hook on add')
+        saveHook('add', feed.key.toString('hex'), ()=>{
+          console.log('fired save hook on add')
+        })        
+      })
+    })
 
-ar.on('changes', function (feed) {
-  console.log('Archiver key is ' + feed.key.toString('hex'))
-})
+    ar.on('remove', function (feed) {
+      console.log('Removing', feed.key.toString('hex'))
+      readHook('remove', ()=>{
+        console.log('fired read hook on remove')
+        saveHook('remove', feed.key.toString('hex'), ()=>{
+          console.log('fired save hook on remove')
+        })        
+      })
+    })
 
-console.log('Watching %s for a list of active feeds', path.join(cwd, 'feeds'))
+    ar.on('changes', function (feed) {
+      console.log('Archiver key is ' + feed.key.toString('hex'))
+      //cb()
+    })
 
-wss.createServer({server: server}, onwebsocket)
-server.on('request', function (req, res) {
-  res.setHeader('Content-Type', 'application/json')
-  res.end(JSON.stringify({
-    name: 'hypercored',
-    version: require('./package').version
-  }))
-})
+    console.log('Watching %s for a list of active feeds', path.join(cwd, 'feeds'))
 
-if (argv.swarm !== false) {
-  swarm(ar, {live: true}).on('listening', function () {
-    console.log('Swarm listening on port %d', this.address().port)
-  })
-}
+    wss.createServer({server: server}, onwebsocket)
+    server.on('request', function (req, res) {
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify({
+        name: 'hypercored',
+        version: require('./package').version
+      }))
+    })
 
-if (argv.websockets === true) {
-  server.listen(port, function () {
-    console.log('WebSocket server listening on port %d', server.address().port)
-  })
+    if (argv.swarm !== false) {
+      swarm(ar, {live: true}).on('listening', function () {
+        console.log('Swarm listening on port %d', this.address().port)
+      })
+    }
+
+    if (argv.websockets === true) {
+      server.listen(port, function () {
+        console.log('WebSocket server listening on port %d', server.address().port)
+      })
+    }
+  }
 }
 
 function resolveAll (links, cb) {
