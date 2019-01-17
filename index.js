@@ -40,12 +40,15 @@ if (unencryptedWebsockets) {
 }
 
 module.exports = {
-  init: function(eventHooks, opts){
+  init: function(eventHooks, opts, cb){
+    if (!cb) return init(eventHooks, opts, ()=>{})
     options = opts
     var saveHook = eventHooks.save
     var readHook = eventHooks.read
     var metadataHook = eventHooks.meta
-    initPubNub(opts)
+    var pubnub = initPubNub(opts, pubnub=>{
+      cb(pubnub)
+    })
     ar = archiver(path.join(cwd, 'archiver'), argv._[0])
     var server = http.createServer()
 
@@ -113,7 +116,7 @@ module.exports = {
         console.log('WebSocket server listening on port %d', server.address().port)
       })
     }
-    function initPubNub(opts){ 
+    function initPubNub(opts, cb){ 
       pubnubOptions = opts
       pubnub = new PubNub({
           subscribeKey: opts.mySubscribeKey || 'demo',
@@ -154,6 +157,7 @@ module.exports = {
       pubnub.subscribe({
           channels: [pubnubOptions.myChannel || 'demo'],
       })
+      return cb(pubnub)
     }
     readFile(options.feedPath || path.join(cwd, 'feeds'), function (file) {
       resolveAll(file.toString().trim().split('\n'), function (err, feeds) {
