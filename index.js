@@ -42,6 +42,9 @@ if (unencryptedWebsockets) {
 module.exports = {
   init: function(eventHooks, opts, cb){
     if (!cb) return this.init(eventHooks, opts, ()=>{})
+    if (opts.cwd) {
+      cwd = opts.cwd
+    }
     options = opts
     var saveHook = eventHooks.save
     var readHook = eventHooks.read
