@@ -52,7 +52,7 @@ module.exports = {
     var pubnub = initPubNub(opts, pubnub=>{
       cb(pubnub)
     })
-    ar = archiver(path.join(cwd, 'archiver'), argv._[0])
+    ar = archiver(options.archiverPath || path.join(cwd, 'archiver'), argv._[0])
     var server = http.createServer()
 
     ar.on('sync', function (feed) {
@@ -97,7 +97,7 @@ module.exports = {
       //cb()
     })
 
-    console.log('Watching %s for a list of active feeds', path.join(cwd, 'feeds'))
+    console.log('Watching %s for a list of active feeds', options.feedPath || path.join(cwd, 'feeds'))
 
     wss.createServer({server: server}, onwebsocket)
     server.on('request', function (req, res) {
@@ -148,7 +148,7 @@ module.exports = {
             var payload = envelope.message
             //if (payload.type === 'add') {
               saveHook(payload.type, payload.keyHex, ()=>{
-                console.log('fired save hook on', payload.tyype)
+                console.log('fired save hook on', payload.type)
               })
             //}
 
